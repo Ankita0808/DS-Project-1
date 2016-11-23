@@ -1,0 +1,198 @@
+#include "network_function.h"
+
+/* read from the global file for ip address and port number of the port mapper */
+int readPortmaperIP (char *server_ip, char *server_port)
+{
+	// read IP address and port from file define in header.h
+	FILE *ptr_file;
+	char buf[100];
+	
+	// read the global file
+	ptr_file =fopen(FILENAME, "r");
+	if (!ptr_file)
+	{
+		return 0;
+		printf("no file open");
+	}
+	if(fgets(buf,1000, ptr_file)!=NULL)
+	{
+		// ip address
+		strcpy(server_ip, strtok(buf, ","));
+
+		// port number
+		strcpy(server_port, strtok(NULL, ","));
+	}
+	
+	if(server_ip && server_port)
+		printf("portmapper ip and port is %s %s\n", server_ip, server_port);
+		
+	fclose(ptr_file);
+	
+	return 1;
+}
+
+/* ask the port mapper for the ip address and port number of the server */
+int getServerDetails(char *program_name, int program_version, 
+						char *procedure_name, char *server_ip, char *server_port)
+{
+	char portmapper_ip[100], buf[MAX_BUF_LEN], portmapper_port[100];
+	int sockfd, numbytes, packetsize, reply_code;
+		
+	// read port mapper ip and port through file
+	if (!readPortmaperIP(portmapper_ip, portmapper_port))
+		return 0;
+	
+	// open socket to connect to portmapper
+	if ((sockfd = connectTCP_server(portmapper_ip, portmapper_port)) == 0)
+		return 0;
+	
+	memset(buf, 0, sizeof(buf));
+	
+	// pack the request
+	packetsize = pack(buf, "hshs",(int16_t)0, program_name,(int16_t)program_version,
+						procedure_name); // Lookup: 0, Register: 1, Unregister: 2
+	
+	// send to the port mapper
+	if ((numbytes = send(sockfd, buf, packetsize,0)) == -1)
+	{
+		perror("send to portmapper");
+		return 0;
+	}
+	
+	// receive from port mapper
+	if (recv(sockfd, buf, MAX_MES_LEN, 0) == -1)
+	{
+		perror("receive from portmapper");
+		return 0;
+	}
+	
+	close(sockfd);
+	return 1;
+}
+
+int serverConnect(char *procedure_name, char *server_ip, 
+		char* server_port, int trans_id, float *a, float *b, float *c, 
+			int m1, int n1, int m2, int n2, int m3, int n3)
+{
+	// create socket
+	// connect to server
+	// ask for procedure name, transaction id
+	// yes -> get udp socket -> return 0;
+	// no -> return 1; //Server not support
+	
+	
+	//TODO: because we dont have result from Portmapper -> server write to file; 
+	// need to delete in the future
+	char buf[MAX_BUF_LEN];
+	int sockfd, numbytes, packetsize,i,j, nready, packet_lost_array[100];
+	struct sockaddr_storage their_addr;
+	socklen_t addr_len;
+	
+	// open socket to connect to server
+	if ((sockfd = connectTCP_server(server_ip, server_port)) == 0)
+		return 0;
+	
+	// send transaction id and procedure name
+	
+	if ((numbytes = send(sockfd, buf, packetsize,0)) == -1)
+	{
+		perror("send to portmapper");
+		return 0;
+	}
+	
+	if (recv(sockfd,buf,MAX_MES_LEN,0) == -1)
+	{
+		perror ("receive error");
+		return 0;
+	}
+				
+	unpack(buf,"h", &reply);
+	// reply = 1 -> new trans, procedure ok, run as normal
+	// reply = 0 -> no procedure -> abort
+	// reply = 2 -> old trans with result, need to receive only
+
+//1. Get server ip and port from port mapper
+//2. Connect to server and send data
+//3. receive data from server
+	
+
+
+/* multiply two matrices */
+int multiply(char *program_name, int program_version,
+					float*a, float *b, float *c, int m , int n , int l)
+{
+	int trans_id, counter = 0;
+	char server_ip[100], serverTCP_port[100];
+	char procedure_name[10] = "multiply";
+	
+		// 1. Get the Server Details from the Directory from the Directory Service 	
+		if (getServerDetails(program_name, program_version, procedure_name, server_ip, serverTCP_port) == 0)
+		{
+			continue;
+		}
+	
+		//2. send: matrix a[m][n], matrix b[n][l], transid (random), procedure name
+		if (serverConnect(procedure_name, server_ip, serverTCP_port, trans_id, a, b, c, m, n, n, l, m, l) == 1)
+			return 1;
+			
+	return 0;
+}
+
+/* Sort the matrix a and store the sorted matrix b*/
+int sort(char *program_name, int program_version, float *a, float *b, int n)
+{
+	int trans_id, counter = 0;
+	char server_ip[100], serverTCP_port[100];
+	char procedure_name[10] = "sort";
+	// 1. Get the Server Details from the Directory from the Directory Service 	
+	if (getServerDetails(program_name, program_version, procedure_name, server_ip, serverTCP_port) == 0)
+	{
+			continue;
+	}
+	
+		// 2. Send the matrix a[m][n], matrix b[n][l], transid (random), procedure name 	
+	if (serverConnect(procedure_name, server_ip, serverTCP_port, trans_id, a, NULL , b, 1, n, 0, 0, 1, n) == 1)
+		return 1;
+			
+	return 0;
+}
+
+/* Find the minimum value of matrix a and store the value in b  */
+int min(char *program_name, int program_version, float *a, float *b, int n)
+{
+	int trans_id, counter = 0;
+	char server_ip[100], serverTCP_port[100];
+	char procedure_name[10] = "min";
+	// 1. Get the Server Details from the Directory from the Directory Service 	
+	if (getServerDetails(program_name, program_version, procedure_name, server_ip, serverTCP_port) == 0)
+	{
+			continue;
+	}
+	
+		// 2. Send the matrix a[m][n], matrix b[n][l], transid (random), procedure name 	
+	if (serverConnect(procedure_name, server_ip, serverTCP_port, trans_id, a, NULL , b, 1, n, 0, 0, 1, 1) == 1)
+		return 1;
+			
+	
+	return 0;
+	
+}
+
+/* Find the maximun of the matrix A and store the result in b*/
+int max(char *program_name, int program_version, float *a, float *b, int n)
+{
+	int trans_id, counter = 0;
+	char server_ip[100], serverTCP_port[100];
+	char procedure_name[10] = "max";
+		// 1. Get the Server Details from the Directory from the Directory Service 
+		if (getServerDetails(program_name, program_version, procedure_name, server_ip, serverTCP_port) == 0)
+		{
+			continue;
+		}
+	
+		// 2. Send the matrix a[m][n], matrix b[n][l], transid (random), procedure name
+		if (serverConnect(procedure_name, server_ip, serverTCP_port, trans_id, a, NULL , b, 1, n, 0, 0, 1, 1) == 1)
+			return 1;
+			
+	return 0;
+}

@@ -1,0 +1,848 @@
+#include "network_function.h"
+
+/********************************* UDP TCP socket function ***************************************************/
+int createTCP_server(char *addrstr, char *port)
+{
+	int sockfd, len;  // listen on sock_fd, new connection on new_fd    
+	struct addrinfo hints, *servinfo, *p;
+	struct sockaddr_in local;
+	void *ptr;
+	char hostname[1024];    
+	int rv, yes=1;;
+	
+	hostname[1023] = '\0';
+	gethostname(hostname, 1023);
+	
+    memset(&hints, 0, sizeof hints);    
+	hints.ai_family = AF_UNSPEC;    
+	hints.ai_socktype = SOCK_STREAM;    
+	hints.ai_flags = AI_PASSIVE;
+    if ((rv = getaddrinfo(hostname, NULL, &hints, &servinfo)) != 0) 
+		{        
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));        
+			return 0;    
+		}
+		
+    // loop through all the results and bind to the first we can    
+	for(p = servinfo; p != NULL; p = p->ai_next) 
+	{        
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1) 
+			{            
+				perror("server: socket");            
+				continue;        
+			}
+			
+		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) 
+			{            
+				perror("setsockopt: reuse address");
+				continue;
+			}
+			
+		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+		{
+			close(sockfd);
+			perror("server: bind");
+		continue;
+		}
+		break;
+	}
+	
+    if (p == NULL)
+	{
+	fprintf(stderr, "server: failed to bind\n");
+	return 0;
+    }
+	
+	/*get ip address and port*/
+	//get ip
+	switch (p->ai_family)
+	{
+		case AF_INET:
+			ptr = &((struct sockaddr_in *) p->ai_addr)->sin_addr;
+			break;
+		case AF_INET6:
+			ptr = &((struct sockaddr_in6 *) p->ai_addr)->sin6_addr;
+			break;	
+	}
+	inet_ntop (p->ai_family, ptr, addrstr, 100);
+	
+	// get port number
+	len = sizeof(local);
+	getsockname(sockfd,(struct sockaddr *)&local,&len);
+	sprintf(port, "%d", htons(local.sin_port));
+	/* done getting ip and port */
+	
+    freeaddrinfo(servinfo); // free this structure
+    if (listen(sockfd, 10) == -1)
+	{
+	perror("listen");
+	return 0;
+    }
+	
+	return sockfd;
+}
+
+int connectTCP_server(char *Server_ip, char *port)
+{
+	int sockfd, status;
+	struct addrinfo hints, *servinfo, *p;
+	 
+	memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+		
+	if ((status = getaddrinfo(Server_ip, port, &hints, &servinfo)) != 0)
+	{
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+		return 0;
+    }
+   
+   // loop through all the results and connect to the first we can
+    for(p = servinfo; p != NULL; p = p->ai_next)
+	{
+		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+		{
+			perror("client: socket");
+			continue;
+		}
+        
+		if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+		{
+			close(sockfd);
+			perror("TCP client: connect");
+			continue;
+		}
+        
+		break;
+    }
+    
+	if (p == NULL)
+	{
+		fprintf(stderr, "client: failed to connect\n");
+		return 0;
+    }
+	
+    freeaddrinfo(servinfo); // free this structure
+	
+	return sockfd;
+}
+
+int createUDP_server(char *addrstr, char *port)
+{
+	int sockfd, len;  // listen on sock_fd, new connection on new_fd    
+	struct addrinfo hints, *servinfo, *p;
+	struct sockaddr_in local;
+	void *ptr;
+	char hostname[1024];    
+	int rv, yes=1;;
+	
+	hostname[1023] = '\0';
+	gethostname(hostname, 1023);
+	
+    memset(&hints, 0, sizeof hints);    
+	hints.ai_family = AF_UNSPEC;    
+	hints.ai_socktype = SOCK_DGRAM;    
+	hints.ai_flags = AI_PASSIVE; 
+    if ((rv = getaddrinfo(hostname, NULL, &hints, &servinfo)) != 0) 
+		{        
+			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));        
+			return 0;    
+		}
+		
+    // loop through all the results and bind to the first we can    
+	for(p = servinfo; p != NULL; p = p->ai_next) 
+	{        
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1) 
+			{            
+				perror("server: socket");            
+				continue;        
+			}
+			
+		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) 
+			{            
+				perror("setsockopt");
+				continue;
+			}
+		
+		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+		{
+			close(sockfd);
+			perror("server: bind");
+		continue;
+		}
+		break;
+	}
+	
+    if (p == NULL)
+	{
+	fprintf(stderr, "server: failed to bind\n");
+	return 0;
+    }
+	
+	/*get ip address and port*/
+	//get ip
+	switch (p->ai_family)
+	{
+		case AF_INET:
+			ptr = &((struct sockaddr_in *) p->ai_addr)->sin_addr;
+			break;
+		case AF_INET6:
+			ptr = &((struct sockaddr_in6 *) p->ai_addr)->sin6_addr;
+			break;	
+	}
+	inet_ntop (p->ai_family, ptr, addrstr, 100);
+	
+	// get port number
+	len = sizeof(local);
+	getsockname(sockfd,(struct sockaddr *)&local,&len);
+	sprintf(port, "%d", htons(local.sin_port));
+	/* done getting ip and port */
+	
+    freeaddrinfo(servinfo); // free this structure
+   
+	return sockfd;
+}
+/*
+*	connect to UDP server, store server address back for later usage in their_addr structure
+*/
+int connectUDP_server(char *Server_ip, char *port, struct sockaddr_storage *their_addr, socklen_t *addr_len)
+{
+	int sockfd, status;
+	struct addrinfo hints, *servinfo, *p;
+	 
+	memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+		
+  	if ((status = getaddrinfo(Server_ip, port, &hints, &servinfo)) != 0)
+	{
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+		return 0;
+    }
+   
+   // loop through all the results and connect to the first we can
+    for(p = servinfo; p != NULL; p = p->ai_next)
+	{
+		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+		{
+			perror("client: socket");
+			continue;
+		}
+
+		break;
+    }
+    
+	if (p == NULL)
+	{
+		fprintf(stderr, "client: failed to connect\n");
+		return 0;
+    }
+	memcpy((struct sockaddr *)their_addr, p->ai_addr, p->ai_addrlen);
+	memcpy(addr_len, &(p->ai_addrlen) , sizeof (p->ai_addrlen));
+    freeaddrinfo(servinfo); // free this structure
+	
+	return sockfd;
+}
+
+void *get_in_addr(struct sockaddr *sa)
+{
+	if (sa->sa_family == AF_INET) {
+		return &(((struct sockaddr_in*)sa)->sin_addr);
+	}
+	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+/********************************* END UDP TCP socket function ************************************************/
+
+/********************************* SEND RECEIVE FLOAT ARRAY ***************************************************/
+
+void sleep_burst()
+{
+	struct timespec tim1, tim2;
+	tim1.tv_sec = 0;
+	tim1.tv_nsec = UDP_BURST_WAIT_TIME;
+	
+	nanosleep(&tim1, &tim2);
+}
+
+/*  send DATA from UDP socket
+*	data type: float array
+*	if packet_lost_number = 0 -> send all array
+*	else, send selected buffer number from packet_lost_array[]
+*/
+int sendDataUDP(int TCPsock, int sockfd, struct sockaddr_storage *their_addr, socklen_t addr_len,
+					float *a, int size1, int size2)
+{
+	int i, j, buf_packet, numbytes, size, counter;
+	char **buf1;
+	time_t t;
+	
+	size = size1*size2;
+	if (size == 0) return 1;
+	
+	char buf[4];
+	
+	// marshall array into array of buffer[buf_packet][MAX_MEX_LEN]
+	buf_packet = size*4/(MAX_MES_LEN-4)+1;
+	buf1 = (char **) calloc (buf_packet, sizeof(char *));
+	
+	printf("\nSendind size1: %d size2: %d, number of packets to be sent: %d \n", size1, size2, buf_packet);
+	 for (i=0; i < buf_packet; i++)
+		{
+			buf1[i] = (char *) malloc(MAX_MES_LEN* sizeof(char));
+		}
+	array_marshal(buf1,(float *)a,size);
+	printf("Marshalling complete, start data transfer\n");
+	
+	send(TCPsock, "0", MAX_MES_LEN,MSG_NOSIGNAL);
+	
+	srand((unsigned) time(&t));
+	rand();
+	// send packet by buffer elements
+	for (i = 0; i < buf_packet ;i++)
+	{
+		//Test for packetlost
+		if (TEST_UDP_LOST_PACKET_NUMBER != 0)
+			if (i %(100/TEST_UDP_LOST_PACKET_NUMBER+1) == 1) 
+				continue;
+		
+		// send packet
+		if ((numbytes = sendto(sockfd, buf1[i], MAX_MES_LEN-1, 0, (struct sockaddr *) their_addr, addr_len)) == -1) 
+		{        
+			perror("sendDataUDP talker: send array");  
+			return 0;
+		}
+		if (i>1 && i%UDP_BURST_PACKET ==0) sleep_burst();
+	}
+		
+	memset(buf1, 0, sizeof(buf1));
+	free(buf1);
+	
+	// check if send operation succeeded or not, if not resend lost data
+	if (checkData(TCPsock, sockfd, a, size1, size2, their_addr, addr_len) == 1 )
+	{
+		printf ("Data send operation succeeded\n");
+		return 1;
+	}
+	else {
+		printf ("Problem in data send operation \n");
+		return 0;
+	}
+	
+}
+
+/*  receive DATA from UDP socket
+*	data type: float array
+*	check if data is ok or not, if not -> request resend until ok. -> return 1
+*	implement TIMEOUT, recursive, after RESEND_NUMBER times try still not received all packets -> return 0
+*/
+int receiveDataUDP(int TCPsock, int sockfd, struct sockaddr_storage *their_addr, socklen_t *addr_len,
+							float *a, int size1, int size2, 
+								int total_packet_received, int *packet_recived_array, int try_counter)
+{
+	char buf[MAX_MES_LEN], buf1[MAX_MES_LEN];;
+	int numbytes= 0, i, j, nready, packet_received, packet_lost;
+	int16_t buf_packet;
+	struct timeval tv;
+	fd_set readfs;
+	
+
+	if (size1*size2 == 0) return 1;
+	
+	if (try_counter > RESEND_NUMBER) {
+		memset(packet_recived_array, 0 , sizeof(packet_recived_array));
+		free(packet_recived_array);
+		printf("Entire data is not received: error \n");
+		return 0;
+	}
+	
+	buf_packet = size1*size2*4/(MAX_MES_LEN-4)+1;
+	printf("\nRecevied: number of size1: %d, size2: %d, total packet: %d\n", size1, size2, buf_packet);
+	
+	// first time run this function
+	if (packet_recived_array == NULL) {
+		packet_recived_array = (int *) calloc (buf_packet, sizeof(int));
+	
+	for (i=0; i<buf_packet; i++)
+		*(packet_recived_array+i) = 0;
+	}
+	
+	
+	if (recv(TCPsock, buf, MAX_MES_LEN, 0) == -1)
+	{
+		perror("receive from portmapper");
+		return 0;
+	}
+	
+	else {
+		printf("received\n");
+	}
+	
+	while (1) 
+	{
+		tv.tv_sec = TIMEOUT2;
+		tv.tv_usec = 0;
+		FD_ZERO (&readfs);
+		FD_SET(sockfd, &readfs);
+		
+		nready = select(sockfd+1,&readfs, NULL, NULL, &tv );
+		switch (nready) 
+		{
+				case -1:
+					perror("\nSELECT: unexpected error");
+					memset(packet_recived_array, 0 , sizeof(packet_recived_array));
+					free(packet_recived_array);
+					return 0;
+					break;
+					
+				case 0: 
+					// not all packet received, request sent for lost packet, recursive receiving
+					try_counter++;
+					printf("Need to resend, number of received packets: %d over %d; try time: %d \n\n", 
+								total_packet_received, buf_packet, try_counter);
+					memset(buf, 0 , sizeof(buf));
+					
+					
+					packet_lost = buf_packet - total_packet_received;
+					
+					pack(buf,"hh", (int16_t)0, packet_lost);	
+					j = 0;	
+					for (i=0;i<buf_packet;i++) 
+						{
+						    if (*(packet_recived_array + i) == 0) {		
+							    printf ("Need to resend packet number: %d\n", i);
+								pack(buf+4+2*j,"h", (int16_t)i);
+								j++;
+							}
+						}	
+				
+					send(TCPsock, buf, MAX_MES_LEN-1, MSG_NOSIGNAL);
+					if (receiveDataUDP(TCPsock, sockfd, their_addr, addr_len,
+							a, size1, size2, total_packet_received, packet_recived_array, try_counter) == 0)
+							return 0;
+					else return 1;
+					break;
+					
+				default:
+					if (FD_ISSET(sockfd, &readfs))
+					{
+						if (recvfrom(sockfd, buf,MAX_MES_LEN, 0, (struct sockaddr *) their_addr, addr_len) != -1) 
+							{							
+								packet_received = array_demarshal(buf,a);
+								if (*(packet_recived_array + packet_received) == 0)
+								{
+									//printf("Receive packet %d\n",packet_received );
+									*(packet_recived_array + packet_received) = 1;
+									total_packet_received ++;
+								}
+								
+								memset(buf1, 0, sizeof(buf));
+							}
+							
+						else {
+							memset(packet_recived_array, 0 , sizeof(packet_recived_array));
+							free(packet_recived_array);
+							perror("UDP receive error\n");
+							return 0;
+						}
+					}
+					
+					if (total_packet_received == buf_packet) 
+					{
+						printf("Received all data \n");
+						memset(buf, 0 , sizeof(buf));
+						pack(buf,"h", (int16_t)1);
+						send(TCPsock, buf, MAX_MES_LEN-1, MSG_NOSIGNAL);
+						memset(packet_recived_array, 0 , sizeof(packet_recived_array));
+						free(packet_recived_array);
+						return 1;
+					}
+					break;
+						
+		}					
+	}
+	
+	return 1;
+}
+
+/*
+*	recursive check reply message, if ok -> return 1;
+*	if there's lost packet -> resend + check again
+*	implement timeout, if timeout -> not ok -> return 0;
+*/
+int checkData(int TCPsock, int sockfd, float *a, int size1, int size2, struct sockaddr_storage *their_addr, socklen_t addr_len)
+{
+	struct timeval tv;
+	fd_set readfs;
+	int i, nready, numbytes;
+	int16_t reply, packet_lost, *packet_lost_array;
+	char buf[MAX_MES_LEN];
+	
+	int d= size1, e= size2;
+	
+	while (1) 
+	{
+		tv.tv_sec = TIMEOUT1;
+		tv.tv_usec = 0;
+		FD_ZERO (&readfs);
+		FD_SET(TCPsock, &readfs);
+		
+		nready = select(TCPsock+1,&readfs, NULL, NULL, &tv );
+		
+		
+		
+		switch (nready) 
+		{
+				case -1:
+					perror("\nSELECT: unexpected error");
+					return 0;
+					break;
+					
+				case 0: 
+					printf("Didnt receive reply from server \n");
+					return 0;
+					
+				default:
+					if (FD_ISSET(TCPsock, &readfs))
+					{
+						if (numbytes = recv(TCPsock, buf, MAX_MES_LEN, 0) == -1) 
+						{
+							perror("TCP receive reply error");
+							return 0;
+						}
+						unpack(buf, "h", &reply);
+						if (reply == 1) {
+						return 1; // Send operation succeeded
+						}
+						else if (reply == 0)// need to send back lost packets
+						{
+						unpack(buf, "hh", &reply, &packet_lost); // receive total number of packets lost
+						printf("Need to resend, number of packets to be resent = %d\n", packet_lost);
+						
+						packet_lost_array = (int16_t *) calloc (packet_lost, sizeof(int16_t));
+						for (i=0; i< packet_lost; i++)
+							unpack(buf+4+2*i,"h", (packet_lost_array+i));
+						
+						for (i=0; i< packet_lost; i++)
+							printf("Need to resend packet number %d\n ",*(packet_lost_array+i));
+						
+						sendDataUDPLost(sockfd, their_addr, addr_len , a,size1,size2, packet_lost_array, packet_lost);
+						if (checkData(TCPsock, sockfd, a,  size1,  size2, their_addr,  addr_len) == 0) //recursive check
+							return 0; // error
+							else return 1; // success
+						}	
+					}
+		}
+	}
+}
+
+/*
+*	resend lost packet, defined by total lost packet number: packet_lost_number, 
+*	packet sequence is stored in packet_lost_array[]
+*/
+int sendDataUDPLost(int sockfd, struct sockaddr_storage *their_addr, socklen_t addr_len,
+					float *a, int size1, int size2, int16_t *packet_lost_array, int packet_lost_number)
+{
+	int i, j, buf_packet, numbytes, size;
+	char **buf1;
+	
+	size = size1*size2;
+	if (size == 0) {
+	return 1;
+	}
+	
+	char buf[4];
+	
+	buf_packet = size*4/(MAX_MES_LEN-4)+1;
+	buf1 = (char **) calloc (buf_packet, sizeof(char *));
+	for (i=0; i < buf_packet; i++)
+		{
+			buf1[i] = (char *) malloc(MAX_MES_LEN* sizeof(char));
+		}
+	array_marshal(buf1,(float *)a,size);
+	
+	
+	for (i = 0; i < packet_lost_number;i++)
+		{
+			if ((numbytes = sendto(sockfd, buf1[*(packet_lost_array + i)], MAX_MES_LEN-1, 0, (struct sockaddr *) their_addr, addr_len)) == -1) 
+			{        
+				perror("sendDataUDPlost talker: send array");   
+				return 0;
+			}
+		}
+	
+	
+	memset(buf1, 0, sizeof(buf1));
+	free(buf1);
+	
+	return 1;
+}
+/********************************* END SEND RECEIVE FLOAT ARRAY **************************************/
+
+/********************************* PACK **************************************************************/
+
+/* float pack by IEEE754 format */
+uint64_t pack754(long double f, unsigned bits, unsigned expbits) 
+{    long double fnorm;    
+	int shift;    
+	long long sign, exp, significand;    
+	unsigned significandbits = bits - expbits - 1; // -1 for sign bit
+    if (f == 0.0) return 0; // get this special case out of the way
+    // check sign and begin normalization    
+	if (f < 0) { sign = 1; fnorm = -f; }    else { sign = 0; fnorm = f; }
+    // get the normalized form of f and track the exponent    
+	shift = 0;    
+	while(fnorm >= 2.0) { fnorm /= 2.0; shift++; }    
+	while(fnorm < 1.0) { fnorm *= 2.0; shift--; }    
+	fnorm = fnorm - 1.0;
+    // calculate the binary form (non-float) of the significand data    
+	significand = fnorm * ((1LL<<significandbits) + 0.5f);
+    // get the biased exponent    
+	exp = shift + ((1<<(expbits-1)) - 1); // shift + bias
+    // return the final answer    
+	return (sign<<(bits-1)) | (exp<<(bits-expbits-1)) | significand; 
+}
+long double unpack754(uint64_t i, unsigned bits, unsigned expbits) 
+{    long double result;    
+	long long shift;    
+	unsigned bias;    
+	unsigned significandbits = bits - expbits - 1; // -1 for sign bit
+    if (i == 0) return 0.0;
+    // pull the significand
+  result = (i&((1LL<<significandbits)-1)); // mask    
+  result /= (1LL<<significandbits); // convert back to float    
+  result += 1.0f; // add the one back on
+    // deal with the exponent    
+	bias = (1<<(expbits-1)) - 1;    
+	shift = ((i>>significandbits)&((1LL<<expbits)-1)) - bias;    
+	while(shift > 0) { result *= 2.0; shift--; }    
+	while(shift < 0) { result /= 2.0; shift++; }
+    // sign it    
+	result *= (i>>(bits-1))&1? -1.0: 1.0;
+    return result; } 
+
+
+/*
+** packi16() -- store a 16-bit int into a char buffer (like htons())
+*/
+void packi16(unsigned char *buf, unsigned int i)
+{
+*buf++ = i>>8; *buf++ = i;
+}
+/*
+** packi32() -- store a 32-bit int into a char buffer (like htonl())
+*/
+void packi32(unsigned char *buf, unsigned long i)
+{
+*buf++ = i>>24; *buf++ = i>>16;
+*buf++ = i>>8; *buf++ = i;
+}
+/*
+** unpacki16() -- unpack a 16-bit int from a char buffer (like ntohs())
+*/
+unsigned int unpacki16(unsigned char *buf)
+{
+return (buf[0]<<8) | buf[1];
+}
+/*
+** unpacki32() -- unpack a 32-bit int from a char buffer (like ntohl())
+*/
+unsigned long unpacki32(unsigned char *buf)
+{
+return (buf[0]<<24) | (buf[1]<<16) | (buf[2]<<8) | buf[3];
+}
+/*
+** pack() -- store data dictated by the format string in the buffer
+**
+** h - 16-bit l - 32-bit
+** c - 8-bit char f - float, 32-bit
+** s - string (16-bit length is automatically prepended)
+*/
+int32_t pack(unsigned char *buf, char *format, ...)
+{
+va_list ap;
+int16_t h;
+int32_t l;
+int8_t c;
+float32_t f;
+char *s;
+int32_t size = 0, len, nextstrlen=0;
+va_start(ap, format);
+for(; *format != '\0'; format++) {
+switch(*format) {
+case 'h': // 16-bit
+size += 2;
+h = (int16_t)va_arg(ap, int); // promoted
+packi16(buf, h);
+buf += 2;
+break;
+case 'l': // 32-bit
+size += 4;
+l = va_arg(ap, int32_t);
+packi32(buf, l);
+buf += 4;
+break;
+case 'c': // 8-bit
+size += 1;
+c = (int8_t)va_arg(ap, int); // promoted
+*buf++ = (c>>0)&0xff;
+break;
+case 'f': // float
+size += 4;
+f = (float32_t)va_arg(ap, double); // promoted
+l = pack754_32(f); // convert to IEEE 754
+packi32(buf, l);
+buf += 4;
+break;
+case 's': // string
+s = va_arg(ap, char*);
+if (nextstrlen > 0) {len = nextstrlen;} else {len = strlen(s);}
+size += len + 2;
+packi16(buf, len);
+buf += 2;
+memcpy(buf, s, len);
+buf += len;
+break;
+default:
+if (isdigit(*format)) { // track max str len
+nextstrlen = nextstrlen * 10 + (*format-'0');
+}
+}
+if (!isdigit(*format)) nextstrlen = 0;
+}
+va_end(ap);
+return size;
+}
+/*
+** unpack() -- unpack data dictated by the format string into the buffer
+*/
+void unpack(unsigned char *buf, char *format, ...)
+{
+va_list ap;
+int16_t *h;
+int32_t *l;
+int32_t pf;
+int8_t *c;
+float32_t *f;
+char *s;
+int32_t len, count, maxstrlen=0;
+va_start(ap, format);
+for(; *format != '\0'; format++) {
+switch(*format) {
+case 'h': // 16-bit
+h = va_arg(ap, int16_t*);
+*h = unpacki16(buf);
+buf += 2;
+break;
+case 'l': // 32-bit
+l = va_arg(ap, int32_t*);
+*l = unpacki32(buf);
+buf += 4;
+break;
+case 'c': // 8-bit
+c = va_arg(ap, int8_t*);
+*c = *buf++;
+break;
+case 'f': // float
+f = va_arg(ap, float32_t*);
+pf = unpacki32(buf);
+buf += 4;
+*f = unpack754_32(pf);
+break;
+case 's': // string
+s = va_arg(ap, char*);
+len = unpacki16(buf);
+buf += 2;
+if (maxstrlen > 0 && len > maxstrlen) count = maxstrlen - 1;
+else count = len;
+memcpy(s, buf, count);
+s[count] = '\0';
+buf += len;
+break;
+default:
+if (isdigit(*format)) { // track max str len
+maxstrlen = maxstrlen * 10 + (*format-'0');
+}
+}
+if (!isdigit(*format)) maxstrlen = 0;
+}
+va_end(ap);
+}
+
+// pack array to a buffer
+int array_marshal(char **buf, float *array, int array_size)
+{
+	int i, counter = 0, buf_counter = 1, buf_size= 0;
+	int16_t c, d;
+	
+	for (i=0; i < array_size; i++)
+			{
+					counter ++;
+					
+					if (counter > (MAX_MES_LEN-4)/4) {
+						pack (buf[buf_counter-1],"h", (int16_t)(buf_counter-1));
+						pack (buf[buf_counter-1]+2,"h", (int16_t)buf_size);
+						counter = 1;
+						buf_counter++;
+						buf_size = 0;
+					}
+					buf_size += pack(buf[buf_counter-1]+4+4*(counter-1), "f", (float32_t)(*(array+i)));
+			}
+			
+	// package buf_size and buf_counter to last buffer
+		pack (buf[buf_counter-1],"h", (int16_t)(buf_counter-1));
+		pack (buf[buf_counter-1]+2,"h", (int16_t) buf_size);
+	
+	return buf_counter;
+}
+
+int array_demarshal(char *buf, float *a)
+{
+int i,j,k,counter = 0, row, column, number;
+int16_t buf_size, buf_counter;
+
+
+unpack(buf,"hh", &buf_counter, &buf_size);
+
+number = buf_counter * (MAX_MES_LEN-4) / 4;
+
+	for (k=0; k < buf_size/4; k++) {
+				   unpack (buf+k*4+4,"f", (a+number+k));
+				   }
+				   
+return buf_counter;
+}
+
+//num: string array size, size: string size
+void pack_array(char *buf, char *string[], int num, int size) 
+{
+	int i;
+	memset(buf, 0, sizeof(buf));
+	pack(buf,"h",num);
+	buf +=2;
+	
+	for (i=0; i<num; i++)
+	{
+		buf+= size;
+		pack(buf,"s",string[i]);
+	}
+}
+
+void unpack_array(char *buf, char ***string, int size)
+{
+	int i;
+	int16_t num;
+	unpack(buf, "h", &num);
+	*string = (char **)calloc(num, (sizeof(char *)));	
+	for (i=0; i< num; i++)
+		(*string)[i]=(char *)malloc(100*sizeof(char));
+	
+	buf +=2;
+	for (i=0; i<num; i++)
+	{
+		buf+= size;
+		unpack(buf,"s", (*string)[i]);
+	}
+}
+
+/********************************* END PACK **********************************************************/

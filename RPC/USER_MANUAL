@@ -1,0 +1,11 @@
+Steps to run and test:
+1.	./make (Makefile already include make clean)
+2.	./portmapper
+3.	./server (can run multiple servers to test load balancing)
+4.	./client (can run multiple clients simultaneously, already has simple gui)
+
+There are some parameters to change and test in header.h, one of them is:
+#define TEST_UDP_LOST_PACKET_NUMBER 0 // percentage of UDP packet loss for test; default is 0
+(This is for testing UDP packet lost. In short, instead of sending all packets, the sender will not send a number of packets based on the define percentage)
+
+For other parameters changes, please read the comment next to it.
